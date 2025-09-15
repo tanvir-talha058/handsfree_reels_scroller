@@ -1,0 +1,8 @@
+# Requirements for Python 3.12+ where mediapipe may not be available
+opencv-python>=4.8.0
+numpy>=1.21.0
+pyautogui>=0.9.54
+pytest>=7.0.0
+
+# Note: MediaPipe not available for Python 3.12+
+# Consider using Python 3.11 or implement OpenCV-only gesture detection

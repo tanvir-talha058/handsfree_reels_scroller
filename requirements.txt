@@ -1,0 +1,8 @@
+opencv-python>=4.8.0
+mediapipe>=0.10.0; python_version<"3.12"
+numpy>=1.21.0
+pyautogui>=0.9.54
+pytest>=7.0.0
+
+# Fallback for newer Python versions where mediapipe isn't available
+# You can use opencv-only gesture detection or downgrade Python to 3.11
