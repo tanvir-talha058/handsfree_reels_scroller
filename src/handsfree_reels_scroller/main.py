@@ -19,6 +19,12 @@ except ImportError:
 from .actions import Action
 from .gesture_recognition import GestureRecognizer, SwipeConfig
 
+# Fallback import
+try:
+    from .opencv_gesture import OpenCVGestureDetector
+except ImportError:
+    OpenCVGestureDetector = None  # type: ignore
+
 # Key mapping for actions (can be adapted per platform)
 KEY_NEXT = "down"
 KEY_PREV = "up"
@@ -37,6 +43,8 @@ def send_action(action: Action) -> None:
 
 
 def run_gesture_mode(args) -> int:
+    # Try MediaPipe first
+    recognizer = None
     try:
         recognizer = GestureRecognizer(
             SwipeConfig(
@@ -46,13 +54,26 @@ def run_gesture_mode(args) -> int:
                 cooldown=args.cooldown,
             )
         )
-    except ImportError as e:
-        print(f"Error: {e}")
-        print("\nSolutions:")
-        print("1. Use Python 3.8-3.11: conda create -n reels python=3.11")
-        print("2. Install from fallback requirements: pip install -r requirements-fallback.txt")
-        print("3. Or manually install compatible versions")
-        return 1
+        print("Using MediaPipe hand tracking for gesture detection.")
+    except ImportError:
+        # Fallback to OpenCV
+        if OpenCVGestureDetector is not None:
+            recognizer = OpenCVGestureDetector(
+                SwipeConfig(
+                    min_displacement=args.min_displacement,
+                    max_duration=args.max_duration,
+                    axis=args.axis,
+                    cooldown=args.cooldown,
+                )
+            )
+            print("MediaPipe not available. Using OpenCV motion detection fallback.")
+            print("Note: OpenCV detection is less accurate than MediaPipe hand tracking.")
+        else:
+            print("Error: Neither MediaPipe nor OpenCV fallback is available.")
+            print("\nSolutions:")
+            print("1. Use Python 3.8-3.11: conda create -n reels python=3.11")
+            print("2. Install MediaPipe manually for your system")
+            return 1
 
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
