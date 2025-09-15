@@ -38,52 +38,64 @@ class OpenCVGestureDetector:
         )
 
     def process_frame(self, frame_bgr) -> Optional[Action]:
-        gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
-        
-        if self.prev_gray is None:
-            self.prev_gray = gray
-            return None
+        try:
+            gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
             
-        # Detect corners in previous frame
-        p0 = cv2.goodFeaturesToTrack(self.prev_gray, mask=None, **self.feature_params)
-        
-        if p0 is None or len(p0) < 5:
-            self.prev_gray = gray
-            return None
-            
-        # Calculate optical flow
-        p1, st, err = cv2.calcOpticalFlowPyrLK(self.prev_gray, gray, p0, None, **self.lk_params)
-        
-        # Select good tracks
-        if p1 is not None and st is not None:
-            good_new = p1[st == 1]
-            good_old = p0[st == 1]
-            
-            if len(good_new) < 5:
+            if self.prev_gray is None:
                 self.prev_gray = gray
                 return None
                 
-            # Calculate average motion
-            motion_vectors = good_new - good_old
-            avg_motion = np.mean(motion_vectors, axis=0)
+            # Simple motion detection using frame difference
+            frame_diff = cv2.absdiff(self.prev_gray, gray)
+            
+            # Threshold to get motion regions
+            _, thresh = cv2.threshold(frame_diff, 25, 255, cv2.THRESH_BINARY)
+            
+            # Find contours of motion
+            contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            if not contours:
+                self.prev_gray = gray
+                return None
+            
+            # Find the largest motion area
+            largest_contour = max(contours, key=cv2.contourArea)
+            area = cv2.contourArea(largest_contour)
+            
+            # Only process significant motion
+            if area < 1000:  # Minimum motion area
+                self.prev_gray = gray
+                return None
+            
+            # Get center of motion
+            M = cv2.moments(largest_contour)
+            if M["m00"] == 0:
+                self.prev_gray = gray
+                return None
+                
+            cx = int(M["m10"] / M["m00"])
+            cy = int(M["m01"] / M["m00"])
+            
+            # Normalize coordinates
+            h, w = gray.shape
+            norm_x = cx / w
+            norm_y = cy / h
             
             now = time.time()
-            h, w = gray.shape
+            self.tracks.append((now, norm_x, norm_y))
             
-            # Normalize motion to frame size
-            norm_dx = avg_motion[0] / w
-            norm_dy = avg_motion[1] / h
+            # Detect swipe from position changes
+            action = self._detect_swipe_from_positions()
             
-            # Store motion data
-            self.tracks.append((now, norm_dx, norm_dy))
+            self.prev_gray = gray
+            return action
             
-            # Detect swipe
-            action = self._detect_swipe_from_tracks()
-            
-        self.prev_gray = gray
-        return action
+        except Exception as e:
+            print(f"OpenCV processing error: {e}")
+            self.prev_gray = gray if 'gray' in locals() else None
+            return None
     
-    def _detect_swipe_from_tracks(self) -> Optional[Action]:
+    def _detect_swipe_from_positions(self) -> Optional[Action]:
         if len(self.tracks) < 3:
             return None
             
@@ -93,34 +105,46 @@ class OpenCVGestureDetector:
         if (now - self.last_action_time) < self.config.cooldown:
             return None
             
-        # Analyze recent motion
-        recent_tracks = list(self.tracks)[-5:]  # Last 5 frames
+        # Get first and last positions from recent tracks
+        recent_tracks = list(self.tracks)[-10:]  # Last 10 frames
         
-        if len(recent_tracks) < 3:
+        if len(recent_tracks) < 5:
             return None
             
-        # Calculate cumulative motion
-        total_dx = sum(dx for _, dx, dy in recent_tracks)
-        total_dy = sum(dy for _, dx, dy in recent_tracks)
+        # Calculate displacement from start to end
+        start_time, start_x, start_y = recent_tracks[0]
+        end_time, end_x, end_y = recent_tracks[-1]
         
-        # Determine primary axis
-        if self.config.axis == "vertical":
-            primary = total_dy
-            secondary = total_dx
-        else:
-            primary = total_dx
-            secondary = total_dy
+        # Check if motion happened within time limit
+        dt = end_time - start_time
+        if dt > self.config.max_duration:
+            return None
             
-        # Check if motion is significant and primarily in desired axis
+        # Calculate displacement
+        dx = end_x - start_x
+        dy = end_y - start_y
+        
+        # Determine primary axis movement
+        if self.config.axis == "vertical":
+            primary = dy
+            secondary = dx
+        else:
+            primary = dx
+            secondary = dy
+            
+        # Check if movement is significant and primarily in desired axis
         if abs(primary) < self.config.min_displacement:
             return None
             
-        if abs(secondary) > abs(primary) * 0.7:  # Too much cross-axis motion
+        if abs(secondary) > abs(primary) * 0.8:  # Too much cross-axis motion
             return None
             
-        # Determine action
+        # Clear tracks after detection to prevent repeated triggers
+        self.tracks.clear()
         self.last_action_time = now
+        print(f"🎯 Motion detected: {self.config.axis} movement = {primary:.3f} (threshold: {self.config.min_displacement})")
         
+        # Determine action based on direction
         if self.config.axis == "vertical":
             return Action.NEXT if primary > 0 else Action.PREV
         else:
