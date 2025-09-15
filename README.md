@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Handsfree Reels Scroller
 
 Control vertical short-video / reels feeds (e.g., Instagram, YouTube Shorts, TikTok in a browser) using camera-based hand swipe gestures (and future eye-gaze) instead of keyboard/mouse.
@@ -78,3 +79,6 @@ Automating input may violate some platforms' terms of service. Use only for pers
 
 ## License
 MIT (add a LICENSE file if distributing).
+=======
+# handsfree_reels_scroller
+>>>>>>> 6024bed12fdb6ee515c3e2c73dfd45946a0e1c02
