@@ -75,10 +75,10 @@ def send_action(action: Action, key_mode: str = "arrows") -> None:
 
 
 def run_gesture_mode(args) -> int:
-    # Try MediaPipe first
+    # Use enhanced OpenCV detector as primary method
     recognizer = None
-    try:
-        recognizer = GestureRecognizer(
+    if OpenCVGestureDetector is not None:
+        recognizer = OpenCVGestureDetector(
             SwipeConfig(
                 min_displacement=args.min_displacement,
                 max_duration=args.max_duration,
@@ -86,11 +86,12 @@ def run_gesture_mode(args) -> int:
                 cooldown=args.cooldown,
             )
         )
-        print("Using MediaPipe hand tracking for gesture detection.")
-    except ImportError:
-        # Fallback to OpenCV
-        if OpenCVGestureDetector is not None:
-            recognizer = OpenCVGestureDetector(
+        print("🚀 Using Enhanced OpenCV gesture detection (Primary Method)")
+        print("💡 This provides reliable hand gesture detection without MediaPipe dependency")
+    else:
+        # Try MediaPipe as fallback
+        try:
+            recognizer = GestureRecognizer(
                 SwipeConfig(
                     min_displacement=args.min_displacement,
                     max_duration=args.max_duration,
@@ -98,13 +99,12 @@ def run_gesture_mode(args) -> int:
                     cooldown=args.cooldown,
                 )
             )
-            print("MediaPipe not available. Using OpenCV motion detection fallback.")
-            print("Note: OpenCV detection is less accurate than MediaPipe hand tracking.")
-        else:
-            print("Error: Neither MediaPipe nor OpenCV fallback is available.")
+            print("Using MediaPipe hand tracking for gesture detection.")
+        except ImportError:
+            print("Error: Neither OpenCV nor MediaPipe gesture detection is available.")
             print("\nSolutions:")
-            print("1. Use Python 3.8-3.11: conda create -n reels python=3.11")
-            print("2. Install MediaPipe manually for your system")
+            print("1. Ensure OpenCV is installed: pip install opencv-python")
+            print("2. Use Python 3.8-3.11 for MediaPipe: conda create -n reels python=3.11")
             return 1
 
     cap = cv2.VideoCapture(0)
@@ -123,14 +123,15 @@ def run_gesture_mode(args) -> int:
             if action:
                 print(f"Detected action: {action.name}")
                 send_action(action, args.keys)
-            # Show window for feedback with motion info
-            display_frame = frame.copy()
-            cv2.putText(display_frame, "Move hand for swipe gestures", (10, 30), 
+            # Show window for feedback with enhanced info
+            cv2.putText(frame, "Enhanced OpenCV Gesture Detection", (10, 30), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-            cv2.putText(display_frame, "Press 'q' to quit", (10, 60), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            cv2.putText(frame, f"Keys: {args.keys.upper()} | Axis: {args.axis}", (10, 60), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            cv2.putText(frame, "Press 'q' to quit", (10, frame.shape[0] - 20), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
             
-            cv2.imshow("Handsfree Reels (Gesture)", display_frame)
+            cv2.imshow("Handsfree Reels - Enhanced OpenCV", frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
     finally:
