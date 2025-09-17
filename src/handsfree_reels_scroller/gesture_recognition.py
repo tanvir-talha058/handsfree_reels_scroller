@@ -16,7 +16,10 @@ except ImportError:  # pragma: no cover - optional at test time
 
 import numpy as np  # type: ignore
 
-from .actions import Action
+try:
+    from .actions import Action
+except ImportError:
+    from actions import Action
 
 # Indexes for landmarks (MediaPipe Hands) we might use
 # 0: wrist, 8: index fingertip

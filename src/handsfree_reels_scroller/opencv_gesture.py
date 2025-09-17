@@ -15,8 +15,12 @@ from typing import Optional, Tuple, Deque
 from collections import deque
 import time
 
-from .actions import Action
-from .gesture_recognition import SwipeConfig
+try:
+    from .actions import Action
+    from .gesture_recognition import SwipeConfig
+except ImportError:
+    from actions import Action
+    from gesture_recognition import SwipeConfig
 
 class OpenCVGestureDetector:
     """Enhanced OpenCV-based gesture detector using multiple techniques."""

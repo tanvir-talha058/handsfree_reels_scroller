@@ -16,14 +16,19 @@ try:
 except ImportError:
     pyautogui = None  # type: ignore
 
-from .actions import Action
-from .gesture_recognition import GestureRecognizer, SwipeConfig
-
-# Fallback import
+# Handle both relative and absolute imports
 try:
+    from .actions import Action
+    from .gesture_recognition import GestureRecognizer, SwipeConfig
     from .opencv_gesture import OpenCVGestureDetector
 except ImportError:
-    OpenCVGestureDetector = None  # type: ignore
+    # Fallback for direct execution
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+    from actions import Action
+    from gesture_recognition import GestureRecognizer, SwipeConfig
+    from opencv_gesture import OpenCVGestureDetector
 
 # Key mapping for actions (can be adapted per platform)
 KEY_NEXT = "down"
